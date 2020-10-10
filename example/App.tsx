@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     height: 200,
   },
   block5: {
-    backgroundColor: 'black',
+    backgroundColor: 'grey',
     width: '100%',
     height: 200,
   },
