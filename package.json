@@ -1,0 +1,22 @@
+{
+  "name": "@heytea/react-native-swiper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/heytea/react-native-swiper.git"
+  },
+  "keywords": [
+    "react-native-swiper"
+  ],
+  "author": "heytea",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/heytea/react-native-swiper/issues"
+  },
+  "homepage": "https://github.com/heytea/react-native-swiper#readme"
+}
