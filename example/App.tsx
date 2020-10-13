@@ -1,5 +1,5 @@
 import React from 'react';
-import {SafeAreaView, StyleSheet, StatusBar, View} from 'react-native';
+import {SafeAreaView, StyleSheet, StatusBar, View, Text} from 'react-native';
 import HeyteaSwiper from './src/swiper';
 
 const App = () => {
@@ -7,12 +7,22 @@ const App = () => {
     <>
       <StatusBar barStyle="dark-content" />
       <SafeAreaView>
-        <HeyteaSwiper vertical={false}>
-          <View style={styles.block1} />
-          <View style={styles.block2} />
-          <View style={styles.block3} />
-          <View style={styles.block4} />
-          <View style={styles.block5} />
+        <HeyteaSwiper vertical={false} circular={true} autoplay={false} interval={2000}>
+          <View style={[styles.block, styles.yellow]}>
+            <Text>1</Text>
+          </View>
+          <View style={[styles.block, styles.blue]}>
+            <Text>2</Text>
+          </View>
+          <View style={[styles.block, styles.green]}>
+            <Text>3</Text>
+          </View>
+          <View style={[styles.block, styles.red]}>
+            <Text>4</Text>
+          </View>
+          <View style={[styles.block, styles.grey]}>
+            <Text>5</Text>
+          </View>
         </HeyteaSwiper>
       </SafeAreaView>
     </>
@@ -20,30 +30,28 @@ const App = () => {
 };
 
 const styles = StyleSheet.create({
-  block1: {
-    backgroundColor: 'green',
+  block: {
     width: '100%',
     height: 200,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  block2: {
-    backgroundColor: 'red',
-    width: '100%',
-    height: 200,
-  },
-  block3: {
+  yellow: {
     backgroundColor: 'yellow',
-    width: '100%',
-    height: 200,
   },
-  block4: {
+  blue: {
     backgroundColor: 'blue',
-    width: '100%',
-    height: 200,
   },
-  block5: {
+  green: {
+    backgroundColor: 'green',
+  },
+  red: {
+    backgroundColor: 'red',
+  },
+  grey: {
     backgroundColor: 'grey',
-    width: '100%',
-    height: 200,
   },
 });
 

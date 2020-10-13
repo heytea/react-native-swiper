@@ -8,6 +8,8 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Animated,
+  GestureResponderEvent,
 } from 'react-native';
 
 export interface HeyteaSwiperProps {
@@ -37,12 +39,7 @@ export interface HeyteaSwiperProps {
   /** 同时显示的滑块数量 */
   displayMultipleItems?: number;
   /** 指定 swiper 切换缓动动画类型 */
-  easingFunction?:
-    | 'default'
-    | 'linear'
-    | 'easeInCubic'
-    | 'easeOutCubic'
-    | 'easeInOutCubic';
+  easingFunction?: 'default' | 'linear' | 'easeInCubic' | 'easeOutCubic' | 'easeInOutCubic';
   /** current 改变时会触发 change 事件 */
   onChange?: () => void;
   /** swiper-item 的位置发生改变时会触发 transition 事件 */
@@ -53,6 +50,8 @@ export interface HeyteaSwiperProps {
 
 interface IState {
   currentIndex: number;
+  forceUpdate: number;
+  pan: Animated.ValueXY;
 }
 
 interface DragPosition {
@@ -60,16 +59,7 @@ interface DragPosition {
   y: number;
 }
 
-interface Node {
-  val: JSX.Element;
-  pre?: Node;
-  next?: Node;
-}
-
-export default class HeyteaSwiper extends React.Component<
-  HeyteaSwiperProps,
-  IState
-> {
+export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, IState> {
   static defaultProps = {
     style: {},
     indicatorDots: true,
@@ -87,35 +77,104 @@ export default class HeyteaSwiper extends React.Component<
     easingFunction: 'default',
   };
 
-  private windowWidth = Dimensions.get('window').width;
   private loopInterval: any;
   private scrollView: ScrollView | null;
   private startDragPosition: DragPosition;
   private endDragPosition: DragPosition;
-  private firstNode?: Node;
-  private lastNode?: Node;
+  private swiperItems: JSX.Element[];
+  private itemWidth = Dimensions.get('window').width;
+  /**
+   * 是否朝左滑动
+   */
+  private isForwardLeft: boolean;
 
   constructor(props: HeyteaSwiperProps) {
     super(props);
     this.scrollView = null;
     this.startDragPosition = {x: 0, y: 0};
     this.endDragPosition = {x: 0, y: 0};
+    this.swiperItems = [];
+    this.isForwardLeft = true;
     this.state = {
       currentIndex: 0,
+      forceUpdate: 0,
+      pan: new Animated.ValueXY({x: -this.itemWidth, y: 0}),
     };
+  }
+
+  componentDidMount() {
+    this.initData();
+  }
+
+  componentDidUpdate(prevProps: HeyteaSwiperProps) {
+    if (prevProps !== this.props) {
+      this.initData();
+    }
   }
 
   componentWillUnmount() {
     this.loopInterval && clearInterval(this.loopInterval);
   }
 
+  /**
+   * 强制刷新
+   */
+  forceUpdate = () => {
+    this.setState(
+      (prevState) => ({
+        forceUpdate: prevState.forceUpdate > 99 ? 0 : prevState.forceUpdate + 1,
+      }),
+      () => {
+        this.scrollToIndex(1, false);
+      },
+    );
+  };
+
+  /**
+   * 初始化Swiper数据
+   */
+  private initData = () => {
+    const {children, circular} = this.props;
+    let elements: JSX.Element[] = [];
+    if (children) {
+      if (Array.isArray(children)) {
+        const childrenKeys = Object.keys(children);
+        elements = childrenKeys.map((key, index) => {
+          return (
+            <View key={index} style={{width: this.itemWidth}}>
+              {
+                // @ts-ignore
+                children[key]
+              }
+            </View>
+          );
+        });
+      } else {
+        elements = [
+          <View key={1} style={{width: this.itemWidth}}>
+            {children}
+          </View>,
+        ];
+      }
+    }
+    this.swiperItems = circular ? this.getCircularListNode(elements) : elements;
+    this.forceUpdate();
+  };
+
+  /**
+   * 滑动到指定索引位置
+   * @param targetIndex 目标索引
+   * @param animate 是否开启动画
+   */
   scrollToIndex = (targetIndex: number, animate = true) => {
+    const {circular} = this.props;
     this.scrollView &&
       this.scrollView.scrollTo({
-        x: targetIndex * this.windowWidth,
+        x: targetIndex * this.itemWidth + (circular ? this.itemWidth : 0),
         y: 0,
         animated: animate,
       });
+    this.isForwardLeft = targetIndex > this.state.currentIndex;
     this.setState({
       currentIndex: targetIndex,
     });
@@ -132,14 +191,10 @@ export default class HeyteaSwiper extends React.Component<
     const xDiff = this.endDragPosition.x - this.startDragPosition.x;
     if (xDiff < 0) {
       // left
-      Math.abs(xDiff) / this.windowWidth > 0.25
-        ? this.scrollToIndex(currentIndex - 1)
-        : this.scrollToIndex(currentIndex);
+      Math.abs(xDiff) / this.itemWidth > 0.25 ? this.scrollToIndex(currentIndex - 1) : this.scrollToIndex(currentIndex);
     } else if (xDiff > 0) {
       // right
-      Math.abs(xDiff) / this.windowWidth > 0.25
-        ? this.scrollToIndex(currentIndex + 1)
-        : this.scrollToIndex(currentIndex);
+      Math.abs(xDiff) / this.itemWidth > 0.25 ? this.scrollToIndex(currentIndex + 1) : this.scrollToIndex(currentIndex);
     }
     const {autoplay} = this.props;
     if (autoplay) {
@@ -155,7 +210,7 @@ export default class HeyteaSwiper extends React.Component<
   };
 
   startLoop = () => {
-    const {interval, children} = this.props;
+    const {interval, children, circular} = this.props;
     const {currentIndex} = this.state;
     const childrenCount = children ? Object.keys(children).length : 0;
     this.loopInterval && clearInterval(this.loopInterval);
@@ -163,10 +218,14 @@ export default class HeyteaSwiper extends React.Component<
       return;
     }
     this.loopInterval = setInterval(() => {
-      if (currentIndex === childrenCount - 1) {
-        this.scrollToIndex(0);
+      if (circular) {
+        this.scrollToNext();
       } else {
-        this.scrollToIndex(currentIndex + 1);
+        if (currentIndex === childrenCount - 1) {
+          this.scrollToIndex(0);
+        } else {
+          this.scrollToIndex(currentIndex + 1);
+        }
       }
     }, interval);
   };
@@ -175,79 +234,124 @@ export default class HeyteaSwiper extends React.Component<
     this.loopInterval && clearInterval(this.loopInterval);
   };
 
-  getElementListNode = (elements: JSX.Element[]) => {};
-
-  listNodeToArray = () => {};
-
   /**
-   * 将链表中的第一个节点移除，添加到最后作为尾结点
+   * 将顺序表中的第一个节点移除，添加到最后作为尾结点
    */
-  advanceOneNode = (firstNode: Node) => {
-    if (this.firstNode && this.lastNode) {
-      const tmpFirstNode = {...firstNode};
-      tmpFirstNode.next = undefined;
-      this.lastNode.next = tmpFirstNode;
-      this.firstNode = firstNode.next;
+  advanceOneNode = (elements: JSX.Element[]) => {
+    if (elements.length < 2) {
+      return elements;
     }
-  };
-
-  /**
-   * 将链表中的最后一个节点，添加到最前，作为头结点
-   */
-  downOneNode = (lastNode: Node) => {
-    if (this.firstNode && this.lastNode) {
-      const tmpLastNode = {...lastNode};
-      tmpLastNode.next = this.firstNode;
-      tmpLastNode.pre = undefined;
-      this.lastNode = lastNode.pre;
-    }
-  };
-
-  renderItems() {
-    const {children, circular} = this.props;
-    this.windowWidth = Dimensions.get('window').width;
-    let elements: JSX.Element[] = [];
-    let firstElement;
-    let lastElement;
-    if (children) {
-      const childrenKeys = Object.keys(children);
-      const count = childrenKeys.length;
-      elements = childrenKeys.map((key, index) => {
-        if (index === 0) {
-          firstElement = (
-            <View key="first" style={{width: this.windowWidth}}>
-              {
-                // @ts-ignore
-                children[key]
-              }
-            </View>
-          );
-        }
-        if (index === count - 1) {
-          lastElement = (
-            <View key="last" style={{width: this.windowWidth}}>
-              {
-                // @ts-ignore
-                children[key]
-              }
-            </View>
-          );
-        }
-        return (
-          <View key={index} style={{width: this.windowWidth}}>
-            {
-              // @ts-ignore
-              children[key]
-            }
-          </View>
-        );
-      });
-    }
-    if (circular) {
-      return [lastElement, elements, firstElement];
+    const firstNode = elements.shift();
+    if (firstNode) {
+      elements.push(firstNode);
     }
     return elements;
-  }
+  };
+
+  /**
+   * 将顺序表的最后一个节点，添加到最前，作为头结点
+   */
+  downOneNode = (elements: JSX.Element[]) => {
+    if (elements.length < 2) {
+      return elements;
+    }
+    const lastNode = elements.pop();
+    if (lastNode) {
+      elements.unshift(lastNode);
+    }
+    return elements;
+  };
+
+  /**
+   * 获取衔接模式的顺序表节点，需要现第一个元素是原最后一个，现最后一个元素是原第一个
+   */
+  getCircularListNode = (elements: JSX.Element[]) => {
+    if (!elements || elements.length < 2) {
+      return elements;
+    }
+    const firstNode = {...elements[elements.length - 1]};
+    firstNode.key = 'first';
+    const lastNode = {...elements[0]};
+    lastNode.key = 'last';
+    elements.unshift(firstNode);
+    elements.push(lastNode);
+    return elements;
+  };
+
+  onTouchStart = (event: GestureResponderEvent) => {
+    this.startDragPosition = {x: event.nativeEvent.pageX, y: event.nativeEvent.pageY};
+    this.stopLoop();
+  };
+
+  onTouchMove = (event: GestureResponderEvent) => {
+    const xDiff = event.nativeEvent.pageX - this.startDragPosition.x;
+    this.setState({
+      pan: new Animated.ValueXY({
+        x: xDiff - this.itemWidth,
+        y: 0,
+      }),
+    });
+  };
+
+  onTouchEnd = (event: GestureResponderEvent) => {
+    this.endDragPosition = {x: event.nativeEvent.pageX, y: event.nativeEvent.pageY};
+    const xDiff = this.endDragPosition.x - this.startDragPosition.x;
+    if (xDiff < 0) {
+      // left
+      Math.abs(xDiff) / this.itemWidth > 0.25 ? this.scrollToNext() : this.scrollToReset(true);
+    } else if (xDiff > 0) {
+      // right
+      Math.abs(xDiff) / this.itemWidth > 0.25 ? this.scrollToPrev() : this.scrollToReset(true);
+    }
+    const {autoplay} = this.props;
+    if (autoplay) {
+      this.startLoop();
+    } else {
+      this.stopLoop();
+    }
+  };
+
+  scrollToPrev = () => {
+    Animated.timing(this.state.pan, {
+      toValue: {x: 0, y: 0},
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      this.swiperItems.shift();
+      this.swiperItems.pop();
+      this.downOneNode(this.swiperItems);
+      this.getCircularListNode(this.swiperItems);
+      this.scrollToReset(false);
+    });
+  };
+
+  scrollToNext = () => {
+    Animated.timing(this.state.pan, {
+      toValue: {x: -this.itemWidth * 2, y: 0},
+      duration: 500,
+      useNativeDriver: true,
+    }).start(() => {
+      this.swiperItems.shift();
+      this.swiperItems.pop();
+      this.advanceOneNode(this.swiperItems);
+      this.getCircularListNode(this.swiperItems);
+      this.scrollToReset(false);
+    });
+  };
+
+  scrollToReset = (animate = true) => {
+    if (animate) {
+      Animated.timing(this.state.pan, {
+        toValue: {x: -this.itemWidth, y: 0},
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      this.setState({
+        pan: new Animated.ValueXY({x: -this.itemWidth, y: 0}),
+      });
+    }
+  };
 
   renderScrollContent() {
     const {vertical} = this.props;
@@ -262,18 +366,34 @@ export default class HeyteaSwiper extends React.Component<
         onScrollBeginDrag={this.onScrollBeginDrag}
         onScrollEndDrag={this.onScrollEndDrag}
         onMomentumScrollEnd={this.onMomentumScrollEnd}>
-        {this.renderItems()}
+        {this.swiperItems}
       </ScrollView>
     );
   }
 
+  renderCircularContent() {
+    const {} = this.props;
+    const {pan} = this.state;
+    return (
+      <View style={{position: 'relative'}}>
+        <Animated.View
+          style={{
+            position: 'absolute',
+            display: 'flex',
+            flexDirection: 'row',
+            transform: [{translateX: pan.x}, {translateY: pan.y}],
+          }}
+          onTouchStart={this.onTouchStart}
+          onTouchMove={this.onTouchMove}
+          onTouchEnd={this.onTouchEnd}>
+          {this.swiperItems}
+        </Animated.View>
+      </View>
+    );
+  }
+
   renderIndicateDots() {
-    const {
-      children,
-      indicatorColor,
-      indicatorActiveColor,
-      indicatorDots,
-    } = this.props;
+    const {children, indicatorColor, indicatorActiveColor, indicatorDots} = this.props;
     if (!indicatorDots) {
       return null;
     }
@@ -285,12 +405,8 @@ export default class HeyteaSwiper extends React.Component<
         return (
           <View
             style={[
-              index === currentIndex
-                ? styles.indicatorActive
-                : styles.indicator,
-              index === currentIndex
-                ? {backgroundColor: indicatorActiveColor}
-                : {backgroundColor: indicatorColor},
+              index === currentIndex ? styles.indicatorActive : styles.indicator,
+              index === currentIndex ? {backgroundColor: indicatorActiveColor} : {backgroundColor: indicatorColor},
             ]}
           />
         );
@@ -300,7 +416,7 @@ export default class HeyteaSwiper extends React.Component<
   }
 
   render() {
-    const {style, autoplay} = this.props;
+    const {style, autoplay, circular} = this.props;
     if (autoplay) {
       this.startLoop();
     } else {
@@ -308,8 +424,9 @@ export default class HeyteaSwiper extends React.Component<
     }
     return (
       <View style={[styles.container, style]}>
-        {this.renderScrollContent()}
-        {this.renderIndicateDots()}
+        {circular ? this.renderCircularContent() : this.renderScrollContent()}
+        {/* {this.renderScrollContent()} */}
+        {/* {this.renderIndicateDots()} */}
       </View>
     );
   }
