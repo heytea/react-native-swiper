@@ -50,7 +50,6 @@ export interface HeyteaSwiperProps {
 
 interface IState {
   currentIndex: number;
-  forceUpdate: number;
   pan: Animated.ValueXY;
 }
 
@@ -97,7 +96,6 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
     this.isForwardLeft = true;
     this.state = {
       currentIndex: 0,
-      forceUpdate: 0,
       pan: new Animated.ValueXY({x: -this.itemWidth, y: 0}),
     };
   }
@@ -115,15 +113,6 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
   componentWillUnmount() {
     this.loopInterval && clearInterval(this.loopInterval);
   }
-
-  /**
-   * 强制刷新
-   */
-  forceUpdate = () => {
-    this.setState((prevState) => ({
-      forceUpdate: prevState.forceUpdate > 99 ? 0 : prevState.forceUpdate + 1,
-    }));
-  };
 
   /**
    * 初始化Swiper数据
@@ -219,7 +208,7 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
     this.loopInterval = setInterval(() => {
       const {circular} = this.props;
       if (circular) {
-        this.scrollToNext();
+        this.autoScrollToNext();
       } else {
         const {currentIndex} = this.state;
         if (currentIndex === this.getChildrenCount() - 1) {
@@ -320,7 +309,7 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
   scrollToPrev = () => {
     Animated.timing(this.state.pan, {
       toValue: {x: 0, y: 0},
-      duration: 200,
+      duration: 300,
       useNativeDriver: true,
     }).start(() => {
       this.swiperItems.shift();
@@ -331,10 +320,30 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
     });
   };
 
+  autoScrollToPrev = () => {
+    this.setState(
+      {
+        pan: new Animated.ValueXY({x: -this.itemWidth, y: 0}),
+      },
+      () => {
+        Animated.timing(this.state.pan, {
+          toValue: {x: 0, y: 0},
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          this.swiperItems.shift();
+          this.swiperItems.pop();
+          this.downOneNode(this.swiperItems);
+          this.getCircularListNode(this.swiperItems);
+        });
+      },
+    );
+  };
+
   scrollToNext = () => {
     Animated.timing(this.state.pan, {
       toValue: {x: -this.itemWidth * 2, y: 0},
-      duration: 500,
+      duration: 300,
       useNativeDriver: true,
     }).start(() => {
       this.swiperItems.shift();
@@ -345,11 +354,31 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
     });
   };
 
+  autoScrollToNext = () => {
+    this.setState(
+      {
+        pan: new Animated.ValueXY({x: -this.itemWidth, y: 0}),
+      },
+      () => {
+        Animated.timing(this.state.pan, {
+          toValue: {x: -this.itemWidth * 2, y: 0},
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          this.swiperItems.shift();
+          this.swiperItems.pop();
+          this.advanceOneNode(this.swiperItems);
+          this.getCircularListNode(this.swiperItems);
+        });
+      },
+    );
+  };
+
   scrollToReset = (animate = true) => {
     if (animate) {
       Animated.timing(this.state.pan, {
         toValue: {x: -this.itemWidth, y: 0},
-        duration: 500,
+        duration: 300,
         useNativeDriver: true,
       }).start();
     } else {
@@ -380,7 +409,6 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
   renderCircularContent() {
     const {} = this.props;
     const {pan} = this.state;
-    console.log('pan', this.state.pan);
     return (
       <View style={{position: 'relative'}}>
         <Animated.View

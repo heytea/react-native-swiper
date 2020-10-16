@@ -7,7 +7,7 @@ const App = () => {
     <>
       <StatusBar barStyle="dark-content" />
       <SafeAreaView>
-        <HeyteaSwiper vertical={false} circular={false} autoplay={true} interval={3000}>
+        <HeyteaSwiper vertical={false} circular={true} autoplay={true} interval={3000}>
           <View id={1} style={[styles.block, styles.yellow]}>
             <Text>1</Text>
           </View>
