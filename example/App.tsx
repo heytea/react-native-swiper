@@ -7,20 +7,20 @@ const App = () => {
     <>
       <StatusBar barStyle="dark-content" />
       <SafeAreaView>
-        <HeyteaSwiper vertical={false} circular={true} autoplay={false} interval={2000}>
-          <View style={[styles.block, styles.yellow]}>
+        <HeyteaSwiper vertical={false} circular={false} autoplay={true} interval={3000}>
+          <View id={1} style={[styles.block, styles.yellow]}>
             <Text>1</Text>
           </View>
-          <View style={[styles.block, styles.blue]}>
+          <View id={2} style={[styles.block, styles.blue]}>
             <Text>2</Text>
           </View>
-          <View style={[styles.block, styles.green]}>
+          <View id={3} style={[styles.block, styles.green]}>
             <Text>3</Text>
           </View>
-          <View style={[styles.block, styles.red]}>
+          <View id={4} style={[styles.block, styles.red]}>
             <Text>4</Text>
           </View>
-          <View style={[styles.block, styles.grey]}>
+          <View id={5} style={[styles.block, styles.grey]}>
             <Text>5</Text>
           </View>
         </HeyteaSwiper>

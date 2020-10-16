@@ -120,21 +120,16 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
    * 强制刷新
    */
   forceUpdate = () => {
-    this.setState(
-      (prevState) => ({
-        forceUpdate: prevState.forceUpdate > 99 ? 0 : prevState.forceUpdate + 1,
-      }),
-      () => {
-        this.scrollToIndex(1, false);
-      },
-    );
+    this.setState((prevState) => ({
+      forceUpdate: prevState.forceUpdate > 99 ? 0 : prevState.forceUpdate + 1,
+    }));
   };
 
   /**
    * 初始化Swiper数据
    */
   private initData = () => {
-    const {children, circular} = this.props;
+    const {children, circular, autoplay} = this.props;
     let elements: JSX.Element[] = [];
     if (children) {
       if (Array.isArray(children)) {
@@ -159,6 +154,11 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
     }
     this.swiperItems = circular ? this.getCircularListNode(elements) : elements;
     this.forceUpdate();
+    if (autoplay) {
+      this.startLoop();
+    } else {
+      this.stopLoop();
+    }
   };
 
   /**
@@ -210,18 +210,19 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
   };
 
   startLoop = () => {
-    const {interval, children, circular} = this.props;
-    const {currentIndex} = this.state;
-    const childrenCount = children ? Object.keys(children).length : 0;
+    const {interval} = this.props;
+    const childrenCount = this.getChildrenCount();
     this.loopInterval && clearInterval(this.loopInterval);
     if (childrenCount <= 1) {
       return;
     }
     this.loopInterval = setInterval(() => {
+      const {circular} = this.props;
       if (circular) {
         this.scrollToNext();
       } else {
-        if (currentIndex === childrenCount - 1) {
+        const {currentIndex} = this.state;
+        if (currentIndex === this.getChildrenCount() - 1) {
           this.scrollToIndex(0);
         } else {
           this.scrollToIndex(currentIndex + 1);
@@ -232,6 +233,11 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
 
   stopLoop = () => {
     this.loopInterval && clearInterval(this.loopInterval);
+  };
+
+  getChildrenCount = () => {
+    const {children} = this.props;
+    return children ? Object.keys(children).length : 0;
   };
 
   /**
@@ -374,6 +380,7 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
   renderCircularContent() {
     const {} = this.props;
     const {pan} = this.state;
+    console.log('pan', this.state.pan);
     return (
       <View style={{position: 'relative'}}>
         <Animated.View
@@ -416,12 +423,7 @@ export default class HeyteaSwiper extends React.Component<HeyteaSwiperProps, ISt
   }
 
   render() {
-    const {style, autoplay, circular} = this.props;
-    if (autoplay) {
-      this.startLoop();
-    } else {
-      this.stopLoop();
-    }
+    const {style, circular} = this.props;
     return (
       <View style={[styles.container, style]}>
         {circular ? this.renderCircularContent() : this.renderScrollContent()}
